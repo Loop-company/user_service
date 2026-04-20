@@ -43,7 +43,6 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Build user-service
-        working-directory: ./user
         run: go build ./...
 
   lint:
@@ -66,7 +65,6 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.11.4
-          working-directory: ./user
           args: --timeout=5m
 
   test:
