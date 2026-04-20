@@ -43,7 +43,8 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Build user-service
-        run: go build ./user-service/...
+        working-directory: ./user-service
+        run: go build ./...
 
   lint:
     name: Lint
