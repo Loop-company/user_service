@@ -15,10 +15,12 @@ import (
 type MockUserRepository struct {
 	repo.UserRepository
 
-	GetByIDFunc        func(ctx context.Context, id string) (*entity.User, error)
-	UpdateNameFunc     func(ctx context.Context, id, name string) error
-	GetSettingsFunc    func(ctx context.Context, userID string) (*entity.UserSettings, error)
-	UpdateSettingsFunc func(ctx context.Context, userID string, settings map[string]interface{}) error
+	GetByIDFunc          func(ctx context.Context, id string) (*entity.User, error)
+	UpdateNameFunc       func(ctx context.Context, id, name string) error
+	GetSettingsFunc      func(ctx context.Context, userID string) (*entity.UserSettings, error)
+	UpdateSettingsFunc   func(ctx context.Context, userID string, settings map[string]interface{}) error
+	UpdateSettingKeyFunc func(ctx context.Context, userID, key string, value interface{}) error
+	GetSettingKeyFunc    func(ctx context.Context, userID, key string) (interface{}, error)
 }
 
 func (m *MockUserRepository) GetByID(ctx context.Context, id string) (*entity.User, error) {
@@ -47,6 +49,20 @@ func (m *MockUserRepository) UpdateSettings(ctx context.Context, userID string, 
 		return m.UpdateSettingsFunc(ctx, userID, settings)
 	}
 	return errors.New("UpdateSettings not implemented in mock")
+}
+
+func (m *MockUserRepository) UpdateSettingKey(ctx context.Context, userID, key string, value interface{}) error {
+	if m.UpdateSettingKeyFunc != nil {
+		return m.UpdateSettingKeyFunc(ctx, userID, key, value)
+	}
+	return errors.New("UpdateSettingKey not implemented in mock")
+}
+
+func (m *MockUserRepository) GetSettingKey(ctx context.Context, userID, key string) (interface{}, error) {
+	if m.GetSettingKeyFunc != nil {
+		return m.GetSettingKeyFunc(ctx, userID, key)
+	}
+	return nil, errors.New("GetSettingKey not implemented in mock")
 }
 
 // MockUserCache - мок для UserCache
@@ -464,6 +480,135 @@ func TestUserService_UpdateSettings(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestUserService_UpdateSettingKey(t *testing.T) {
+	tests := []struct {
+		name        string
+		userID      string
+		key         string
+		value       interface{}
+		setupMocks  func(*MockUserRepository)
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:   "success - update nested setting key",
+			userID: "user-202",
+			key:    "appearance.theme",
+			value:  "light",
+			setupMocks: func(repo *MockUserRepository) {
+				repo.UpdateSettingKeyFunc = func(ctx context.Context, userID, key string, value interface{}) error {
+					assert.Equal(t, "user-202", userID)
+					assert.Equal(t, "appearance.theme", key)
+					assert.Equal(t, "light", value)
+					return nil
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name:   "error - repo update setting key fails",
+			userID: "user-202",
+			key:    "appearance.theme",
+			value:  "light",
+			setupMocks: func(repo *MockUserRepository) {
+				repo.UpdateSettingKeyFunc = func(ctx context.Context, userID, key string, value interface{}) error {
+					return errors.New("failed to update nested key")
+				}
+			},
+			wantErr:     true,
+			errContains: "failed to update nested key",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &MockUserRepository{}
+			mockCache := &MockUserCache{}
+			if tt.setupMocks != nil {
+				tt.setupMocks(mockRepo)
+			}
+
+			service := NewUserService(mockRepo, mockCache)
+			ctx := context.Background()
+
+			err := service.UpdateSettingKey(ctx, tt.userID, tt.key, tt.value)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestUserService_GetSettingKey(t *testing.T) {
+	tests := []struct {
+		name        string
+		userID      string
+		key         string
+		setupMocks  func(*MockUserRepository)
+		wantValue   interface{}
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:   "success - get nested setting key",
+			userID: "user-303",
+			key:    "appearance.theme",
+			setupMocks: func(repo *MockUserRepository) {
+				repo.GetSettingKeyFunc = func(ctx context.Context, userID, key string) (interface{}, error) {
+					assert.Equal(t, "user-303", userID)
+					assert.Equal(t, "appearance.theme", key)
+					return "dark", nil
+				}
+			},
+			wantValue: "dark",
+			wantErr:   false,
+		},
+		{
+			name:   "error - repo get setting key fails",
+			userID: "user-303",
+			key:    "appearance.theme",
+			setupMocks: func(repo *MockUserRepository) {
+				repo.GetSettingKeyFunc = func(ctx context.Context, userID, key string) (interface{}, error) {
+					return nil, errors.New("setting key not found")
+				}
+			},
+			wantErr:     true,
+			errContains: "setting key not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &MockUserRepository{}
+			mockCache := &MockUserCache{}
+			if tt.setupMocks != nil {
+				tt.setupMocks(mockRepo)
+			}
+
+			service := NewUserService(mockRepo, mockCache)
+			ctx := context.Background()
+
+			value, err := service.GetSettingKey(ctx, tt.userID, tt.key)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantValue, value)
 			}
 		})
 	}
