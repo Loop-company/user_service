@@ -613,3 +613,62 @@ func TestUserService_GetSettingKey(t *testing.T) {
 		})
 	}
 }
+
+func TestUserService_GetStatus(t *testing.T) {
+	tests := []struct {
+		name        string
+		userID      string
+		setupMocks  func(*MockUserCache)
+		wantStatus  string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:   "success - get status",
+			userID: "user-404",
+			setupMocks: func(cache *MockUserCache) {
+				cache.GetStatusFunc = func(ctx context.Context, userID string) (string, error) {
+					return "online", nil
+				}
+			},
+			wantStatus: "online",
+			wantErr:    false,
+		},
+		{
+			name:   "error - cache returns error",
+			userID: "user-404",
+			setupMocks: func(cache *MockUserCache) {
+				cache.GetStatusFunc = func(ctx context.Context, userID string) (string, error) {
+					return "", errors.New("status unavailable")
+				}
+			},
+			wantErr:     true,
+			errContains: "status unavailable",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &MockUserRepository{}
+			mockCache := &MockUserCache{}
+			if tt.setupMocks != nil {
+				tt.setupMocks(mockCache)
+			}
+
+			service := NewUserService(mockRepo, mockCache)
+			ctx := context.Background()
+
+			status, err := service.GetStatus(ctx, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantStatus, status)
+			}
+		})
+	}
+}

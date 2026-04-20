@@ -146,3 +146,15 @@ func TestGenerateDiscriminatorReturnsErrorAfterExhaustion(t *testing.T) {
 		t.Fatal("expected generateDiscriminator to return error after retries")
 	}
 }
+
+func TestNewRegistrationConsumer(t *testing.T) {
+	repository := &userRepoMock{}
+	consumer := NewRegistrationConsumer([]string{"localhost:9092"}, "group-1", repository)
+
+	if consumer == nil {
+		t.Fatal("expected registration consumer to be created")
+	}
+	if consumer.reader == nil {
+		t.Fatal("expected kafka reader to be initialized")
+	}
+}

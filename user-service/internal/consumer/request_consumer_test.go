@@ -8,7 +8,9 @@ import (
 
 	"github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/entity"
 	"github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/eventbus"
+	"github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/producer"
 	servicepkg "github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/service"
+	"github.com/segmentio/kafka-go"
 )
 
 type userServiceMock struct {
@@ -203,4 +205,72 @@ func TestHandleUpdateSettingKey(t *testing.T) {
 	if !called {
 		t.Fatal("expected UpdateSettingKey to be called")
 	}
+}
+
+func TestHandleUpdateStatus(t *testing.T) {
+	called := false
+	service := &userServiceMock{
+		updateStatusFunc: func(ctx context.Context, userID, status string) error {
+			called = true
+			return nil
+		},
+	}
+	consumer := &RequestConsumer{service: service}
+
+	req := &eventbus.Request{
+		CorrelationID: "corr-6",
+		MessageType:   "update_status",
+		Payload:       json.RawMessage(`{"user_id":"123","status":"online"}`),
+	}
+
+	resp := consumer.handleUpdateStatus(context.Background(), req)
+	if !resp.Success {
+		t.Fatalf("expected success response, got %#v", resp)
+	}
+	if !called {
+		t.Fatal("expected UpdateStatus to be called")
+	}
+}
+
+func TestNewRequestConsumer(t *testing.T) {
+	service := &userServiceMock{}
+	responseProducer := producer.NewResponseProducer([]string{"localhost:9092"})
+	defer responseProducer.Close()
+
+	consumer := NewRequestConsumer([]string{"localhost:9092"}, "group-1", service, responseProducer)
+	if consumer == nil {
+		t.Fatal("expected consumer to be created")
+	}
+	if consumer.reader == nil {
+		t.Fatal("expected kafka reader to be initialized")
+	}
+}
+
+func TestHandleRequestUnknownTypeReturnsProducerError(t *testing.T) {
+	service := &userServiceMock{}
+	responseProducer := producer.NewResponseProducer([]string{"127.0.0.1:1"})
+	defer responseProducer.Close()
+
+	consumer := &RequestConsumer{
+		service:  service,
+		producer: responseProducer,
+	}
+
+	req := eventbus.NewRequest("unknown_type", map[string]string{"user_id": "123"}, "user-service.responses")
+	msg := kafka.Message{Value: mustMarshalRequest(t, req)}
+
+	if err := consumer.handleRequest(context.Background(), msg); err == nil {
+		t.Fatal("expected producer send to fail on invalid kafka address")
+	}
+}
+
+func mustMarshalRequest(t *testing.T, req *eventbus.Request) []byte {
+	t.Helper()
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("failed to marshal request: %v", err)
+	}
+
+	return data
 }
