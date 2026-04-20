@@ -88,9 +88,11 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Run tests with coverage
+        working-directory: ./user-service
         run: go test -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Enforce coverage threshold
+        working-directory: ./user-service
         shell: bash
         run: |
           coverage=$(go tool cover -func=coverage.out | awk '/total:/ {gsub("%","",$3); print $3}')
