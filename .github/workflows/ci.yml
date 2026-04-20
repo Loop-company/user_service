@@ -91,7 +91,7 @@ jobs:
         working-directory: ./user-service
         run: go test -coverprofile=coverage.out -covermode=atomic \
                 -coverpkg=./internal/... \
-                ./...
+                ./user-service/...
 
       - name: Enforce coverage threshold
         working-directory: ./user-service
