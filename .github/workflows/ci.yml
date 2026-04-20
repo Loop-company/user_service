@@ -135,8 +135,8 @@ jobs:
       - name: Build Docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./user-service
+          file: ./user-service/Dockerfile
           push: false
           load: true
           tags: docker.io/${{ steps.meta.outputs.namespace }}/loop-user-service:${{ steps.meta.outputs.tag }}
