@@ -1,25 +1,10 @@
-name: CI/CD Pipeline (user-service)
+name: User Service CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
-  workflow_dispatch:
-    inputs:
-      run_docker:
-        description: 'Build and push Docker images'
-        required: false
-        default: false
-        type: boolean
-      skip_tests:
-        description: 'Skip tests (for quick builds)'
-        required: false
-        default: false
-        type: boolean
 
 env:
-  GO_VERSION: "1.25.0"
   COVERAGE_THRESHOLD: "50"
 
 permissions:
@@ -29,7 +14,6 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
 
     steps:
       - name: Checkout source code
@@ -38,18 +22,17 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: user-service/go.mod
           cache: true
-          cache-dependency-path: go.sum
+          cache-dependency-path: user-service/go.sum
 
-      - name: Build user-service
-        working-directory: ./user-service
+      - name: Build user service
+        working-directory: user-service
         run: go build ./...
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    timeout-minutes: 15
 
     steps:
       - name: Checkout source code
@@ -58,23 +41,21 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: user-service/go.mod
           cache: true
-          cache-dependency-path: go.sum
+          cache-dependency-path: user-service/go.sum
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@v6
         with:
-          version: v2.11.4
-          working-directory: ./user-service
+          version: v1.64.8
+          working-directory: user-service
           args: --timeout=5m
 
   test:
-    name: Test & Coverage
+    name: Test and coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: [ build, lint ]
-    if: ${{ !inputs.skip_tests }}
+    needs: [build, lint]
 
     steps:
       - name: Checkout source code
@@ -83,54 +64,65 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: user-service/go.mod
           cache: true
-          cache-dependency-path: go.sum
+          cache-dependency-path: user-service/go.sum
 
       - name: Run tests with coverage
-        working-directory: ./user-service
-        run: |
-          go test -coverprofile=coverage.out -covermode=atomic \
-            -coverpkg=./internal/... \
-            ./...
+        working-directory: user-service
+        run: go test -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/... ./...
 
-      - name: Enforce coverage threshold
-        working-directory: ./user-service
+      - name: Check coverage threshold
+        working-directory: user-service
+        shell: bash
         run: |
-          coverage=$(go tool cover -func=coverage.out | awk '/total:/ {gsub("%","",$3); print $3}')
+          go tool cover -func=coverage.out | tee coverage.txt
+          awk -v threshold="$COVERAGE_THRESHOLD" '
+            /^total:/ {
+              gsub(/%/, "", $3)
+              if ($3 + 0 < threshold + 0) {
+                printf("coverage %.1f%% is below %.1f%%\n", $3, threshold)
+                exit 1
+              }
+              printf("coverage %.1f%% meets threshold %.1f%%\n", $3, threshold)
+            }
+          ' coverage.txt
 
-      - name: Upload coverage
+      - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
-          path: coverage.out
-          retention-days: 7
+          name: user-service-coverage
+          path: |
+            user-service/coverage.out
+            user-service/coverage.txt
 
   docker_build:
-    name: Build Docker Image
+    name: Docker build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [ build, lint, test ]
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_docker == true)
+    needs: [build, lint, test]
 
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Resolve Docker metadata
+      - name: Resolve Docker image metadata
         id: meta
+        shell: bash
+        env:
+          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
         run: |
           branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           branch_slug=$(echo "$branch" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')
-          namespace=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          namespace="$DOCKERHUB_NAMESPACE"
+          if [ -z "$namespace" ]; then
+            namespace=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          fi
           short_sha=$(echo "${GITHUB_SHA}" | cut -c1-7)
           echo "namespace=$namespace" >> "$GITHUB_OUTPUT"
           echo "tag=${branch_slug}-${short_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build Docker image
         uses: docker/build-push-action@v6
@@ -139,44 +131,57 @@ jobs:
           file: ./user-service/Dockerfile
           push: false
           load: true
-          tags: docker.io/${{ steps.meta.outputs.namespace }}/loop-user-service:${{ steps.meta.outputs.tag }}
+          tags: docker.io/${{ steps.meta.outputs.namespace }}/user-service:${{ steps.meta.outputs.tag }}
 
-      - name: Save image
+      - name: Save Docker image
+        shell: bash
         run: |
           mkdir -p images
-          docker save docker.io/${{ steps.meta.outputs.namespace }}/loop-user-service:${{ steps.meta.outputs.tag }} -o images/user-service.tar
+          docker save docker.io/${{ steps.meta.outputs.namespace }}/user-service:${{ steps.meta.outputs.tag }} -o images/user-service.tar
 
-      - name: Upload image artifact
+      - name: Upload Docker image artifact
         uses: actions/upload-artifact@v4
         with:
-          name: docker-image-user
-          path: images/
+          name: user-service-image
+          path: images/user-service.tar
 
   docker_push:
-    name: Push to Docker Hub
+    name: Docker push
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: [ docker_build ]
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_docker == true)
+    needs: [docker_build]
+    if: github.event_name == 'push'
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Resolve Docker image metadata
+        id: meta
+        shell: bash
+        env:
+          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+        run: |
+          branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          branch_slug=$(echo "$branch" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')
+          namespace="$DOCKERHUB_NAMESPACE"
+          if [ -z "$namespace" ]; then
+            namespace=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          fi
+          short_sha=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "namespace=$namespace" >> "$GITHUB_OUTPUT"
+          echo "tag=${branch_slug}-${short_sha}" >> "$GITHUB_OUTPUT"
 
-      - name: Download image
+      - name: Download Docker image artifact
         uses: actions/download-artifact@v4
         with:
-          name: docker-image-user
+          name: user-service-image
           path: images
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Push image
+      - name: Load and push Docker image
+        shell: bash
         run: |
           docker load -i images/user-service.tar
-          docker push docker.io/${{ steps.meta.outputs.namespace }}/loop-user-service:${{ steps.meta.outputs.tag }}
+          docker push docker.io/${{ steps.meta.outputs.namespace }}/user-service:${{ steps.meta.outputs.tag }}
