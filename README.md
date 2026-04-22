@@ -70,7 +70,3 @@ Add these repository secrets before pushing Docker images:
 
 - `DOCKERHUB_USERNAME`
 - `DOCKERHUB_TOKEN`
-
-Optional repository variable:
-
-- `DOCKERHUB_NAMESPACE`

@@ -1,0 +1,4 @@
+profile: user-service/coverage.out
+
+threshold:
+  total: 50
