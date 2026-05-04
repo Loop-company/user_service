@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package user;
+
+option go_package = "user-service/proto;userpb";
+
+service UserService {
+  rpc GetProfile (GetProfileRequest) returns (GetProfileResponse);
+  rpc UpdateName (UpdateNameRequest) returns (Empty);
+  rpc UpdateStatus (UpdateStatusRequest) returns (Empty);
+  rpc GetSettings (GetSettingsRequest) returns (GetSettingsResponse);
+  rpc UpdateSettings (UpdateSettingsRequest) returns (Empty);
+}
+
+message GetProfileRequest {
+  string user_id = 1;
+}
+
+message GetProfileResponse {
+  string user_id = 1;
+  string name = 2;
+  string discriminator = 3;
+  string avatar = 4;
+  string status = 5;
+}
+
+message UpdateNameRequest {
+  string user_id = 1;
+  string name = 2;
+}
+
+message UpdateStatusRequest {
+  string user_id = 1;
+  string status = 2;
+}
+
+message GetSettingsRequest {
+  string user_id = 1;
+}
+
+message GetSettingsResponse {
+  map<string, string> settings = 1;
+}
+
+message UpdateSettingsRequest {
+  string user_id = 1;
+  map<string, string> settings = 2;
+}
+
+message Empty {}

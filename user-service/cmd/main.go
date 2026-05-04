@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,11 +13,14 @@ import (
 
 	"github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/cache"
 	"github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/consumer"
-	"github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/producer"
 	"github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/repo"
 	"github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/service"
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
+
+	usergrpc "github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/grpc"
+	userpb "github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/proto"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -35,19 +39,29 @@ func main() {
 	userCache := cache.NewUserCache(redisClient)
 	userService := service.NewUserService(userRepo, userCache)
 
-	brokers := []string{"kafka:9092"}
+	grpcServer := grpc.NewServer()
 
-	responseProducer := producer.NewResponseProducer(brokers)
-	defer closeProducer(responseProducer)
+	userServer := usergrpc.NewUserServer(userService)
+
+	userpb.RegisterUserServiceServer(grpcServer, userServer)
+
+	lis, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	go func() {
+		log.Println("gRPC server started on :50051")
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("gRPC server failed: %v", err)
+		}
+	}()
+
+	brokers := []string{"kafka:9092"}
 
 	regConsumer := consumer.NewRegistrationConsumer(brokers, "user-service-reg-group", userRepo)
 	if err := regConsumer.Start(context.Background()); err != nil {
 		log.Fatalf("Reg consumer failed: %v", err)
-	}
-
-	reqConsumer := consumer.NewRequestConsumer(brokers, "user-service-req-group", userService, responseProducer)
-	if err := reqConsumer.Start(context.Background()); err != nil {
-		log.Fatalf("Req consumer failed: %v", err)
 	}
 
 	log.Println("User Service is ready")
@@ -68,12 +82,6 @@ func closeDB(db *sql.DB) {
 func closeRedis(client *redis.Client) {
 	if err := client.Close(); err != nil {
 		log.Printf("Warning: failed to close redis: %v", err)
-	}
-}
-
-func closeProducer(p *producer.ResponseProducer) { // тип подставь точно, как у тебя в producer
-	if err := p.Close(); err != nil {
-		log.Printf("Warning: failed to close response producer: %v", err)
 	}
 }
 
