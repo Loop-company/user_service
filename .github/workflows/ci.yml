@@ -19,7 +19,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: user-service/go.mod
+          go-version: '1.24'
           cache: true
           cache-dependency-path: user-service/go.sum
 
@@ -38,14 +38,14 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: user-service/go.mod
+          go-version: '1.24'
           cache: true
           cache-dependency-path: user-service/go.sum
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v1.64.0
           working-directory: user-service
           args: --config=../.golangci.yml
 
