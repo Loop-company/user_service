@@ -5,14 +5,17 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/cache"
 	"github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/consumer"
+	"github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/eventbus"
 	"github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/repo"
 	"github.com/Egor4iksls4/DiscordEquivalent/backend/user-service/internal/service"
 	_ "github.com/lib/pq"
@@ -37,7 +40,11 @@ func main() {
 
 	userRepo := repo.NewUserRepo(db)
 	userCache := cache.NewUserCache(redisClient)
-	userService := service.NewUserService(userRepo, userCache)
+
+	brokers := getKafkaBrokers()
+	kafkaProducer := eventbus.NewKafkaProducer(brokers, slog.Default())
+
+	userService := service.NewUserService(userRepo, userCache, kafkaProducer)
 
 	grpcServer := grpc.NewServer()
 
@@ -56,8 +63,6 @@ func main() {
 			log.Fatalf("gRPC server failed: %v", err)
 		}
 	}()
-
-	brokers := []string{"kafka:9092"}
 
 	regConsumer := consumer.NewRegistrationConsumer(brokers, "user-service-reg-group", userRepo)
 	if err := regConsumer.Start(context.Background()); err != nil {
@@ -162,3 +167,12 @@ func initRedis() *redis.Client {
 
 	return client
 }
+
+func getKafkaBrokers() []string {
+	brokers := os.Getenv("KAFKA_BROKERS")
+	if brokers == "" {
+		return []string{"localhost:9092"}
+	}
+	return strings.Split(brokers, ",")
+}
+

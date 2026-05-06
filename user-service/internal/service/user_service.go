@@ -23,15 +23,22 @@ type UserService interface {
 	GetSettingKey(ctx context.Context, userID, key string) (interface{}, error)
 }
 
-type UserServiceImpl struct {
-	repo  repo.UserRepository
-	cache cache.UserCacheInterface
+type EventBus interface {
+	SendUserProfileUpdated(ctx context.Context, userID string, changes map[string]interface{})
+	SendUserSettingsUpdated(ctx context.Context, userID string, settings map[string]interface{})
 }
 
-func NewUserService(repo repo.UserRepository, cache cache.UserCacheInterface) *UserServiceImpl {
+type UserServiceImpl struct {
+	repo     repo.UserRepository
+	cache    cache.UserCacheInterface
+	eventBus EventBus
+}
+
+func NewUserService(repo repo.UserRepository, cache cache.UserCacheInterface, eventBus EventBus) *UserServiceImpl {
 	return &UserServiceImpl{
-		repo:  repo,
-		cache: cache,
+		repo:     repo,
+		cache:    cache,
+		eventBus: eventBus,
 	}
 }
 
@@ -67,7 +74,11 @@ func (s *UserServiceImpl) UpdateName(ctx context.Context, userID, name string) e
 		return fmt.Errorf("name must be at most 32 characters")
 	}
 
-	return s.repo.UpdateName(ctx, userID, name)
+	err := s.repo.UpdateName(ctx, userID, name)
+	if err == nil {
+		s.eventBus.SendUserProfileUpdated(ctx, userID, map[string]interface{}{"name": name})
+	}
+	return err
 }
 
 // UpdateStatus - обновляет статус пользователя (online/offline/active)
@@ -84,7 +95,11 @@ func (s *UserServiceImpl) UpdateStatus(ctx context.Context, userID, status strin
 		return fmt.Errorf("invalid status: %s", status)
 	}
 
-	return s.cache.SetStatus(ctx, userID, status)
+	err := s.cache.SetStatus(ctx, userID, status)
+	if err == nil {
+		s.eventBus.SendUserProfileUpdated(ctx, userID, map[string]interface{}{"status": status})
+	}
+	return err
 }
 
 // GetStatus - получает статус пользователя
@@ -99,12 +114,20 @@ func (s *UserServiceImpl) GetSettings(ctx context.Context, userID string) (*enti
 
 // UpdateSettings - обновляет все настройки
 func (s *UserServiceImpl) UpdateSettings(ctx context.Context, userID string, settings map[string]interface{}) error {
-	return s.repo.UpdateSettings(ctx, userID, settings)
+	err := s.repo.UpdateSettings(ctx, userID, settings)
+	if err == nil {
+		s.eventBus.SendUserSettingsUpdated(ctx, userID, settings)
+	}
+	return err
 }
 
 // UpdateSettingKey - обновляет конкретный ключ в настройках
 func (s *UserServiceImpl) UpdateSettingKey(ctx context.Context, userID, key string, value interface{}) error {
-	return s.repo.UpdateSettingKey(ctx, userID, key, value)
+	err := s.repo.UpdateSettingKey(ctx, userID, key, value)
+	if err == nil {
+		s.eventBus.SendUserSettingsUpdated(ctx, userID, map[string]interface{}{key: value})
+	}
+	return err
 }
 
 // GetSettingKey - получает значение конкретного ключа

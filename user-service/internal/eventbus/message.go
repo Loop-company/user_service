@@ -14,6 +14,23 @@ type Event struct {
 	Data      interface{} `json:"data"`
 }
 
+type Request struct {
+	CorrelationID string      `json:"correlation_id"`
+	MessageType   string      `json:"message_type"`
+	Timestamp     string      `json:"timestamp"`
+	Data          interface{} `json:"data"`
+	ReplyTo       string      `json:"reply_to"`
+}
+
+type Response struct {
+	CorrelationID string      `json:"correlation_id"`
+	MessageType   string      `json:"message_type"`
+	Timestamp     string      `json:"timestamp"`
+	Success       bool        `json:"success"`
+	Data          interface{} `json:"data,omitempty"`
+	Error         string      `json:"error,omitempty"`
+}
+
 // EventType - типы событий
 type EventType string
 
@@ -29,5 +46,26 @@ func NewEvent(eventType EventType, data interface{}) *Event {
 		Type:      eventType,
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Data:      data,
+	}
+}
+
+func NewRequest(messageType string, data interface{}, replyTo string) *Request {
+	return &Request{
+		CorrelationID: uuid.New().String(),
+		MessageType:   messageType,
+		Timestamp:     time.Now().UTC().Format(time.RFC3339),
+		Data:          data,
+		ReplyTo:       replyTo,
+	}
+}
+
+func NewResponse(correlationID, messageType string, success bool, data interface{}, errorMessage string) *Response {
+	return &Response{
+		CorrelationID: correlationID,
+		MessageType:   messageType,
+		Timestamp:     time.Now().UTC().Format(time.RFC3339),
+		Success:       success,
+		Data:          data,
+		Error:         errorMessage,
 	}
 }
