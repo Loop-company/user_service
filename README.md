@@ -31,8 +31,6 @@ User Service:
 - `GetSettings(user_id)` - возвращает настройки пользователя.
 - `UpdateSettings(user_id, settings)` - обновляет настройки.
 
-HTTP Gateway вызывает эти методы для protected HTTP routes. Идентичность пользователя проверяется gateway через Auth Service, а в User Service передается `user_id` в gRPC request.
-
 ## Kafka data flow
 
 User Service читает `user.events`:
@@ -44,57 +42,14 @@ User Service публикует в `user.events`:
 - `user.profile_updated` при изменении профиля;
 - `user.settings_updated` при изменении настроек.
 
-Envelope событий:
-
-```json
-{
-  "event_id": "uuid",
-  "user_id": "user-guid",
-  "event_type": "user.profile_updated",
-  "source_service": "user-service",
-  "payload": {
-    "changes": {
-      "name": "new-name"
-    }
-  },
-  "occurred_at": "2026-05-07T12:00:00Z"
-}
-```
-
-Analytics Service читает этот же топик и сохраняет события для отчетов.
-
-## Переменные окружения
-
-Пример есть в `user-service/.env.example`.
-
-```env
-GRPC_PORT=50052
-
-POSTGRES_HOST=db-user
-POSTGRES_PORT=5432
-POSTGRES_DB=userdb
-POSTGRES_USER=user
-POSTGRES_PASSWORD=user_password
-
-REDIS_HOST=redis-user
-REDIS_PORT=6379
-REDIS_PASSWORD=
-
-KAFKA_BROKERS=kafka:9092
-```
-
 ## Запуск
 
-Для запуска User Service через Docker Compose из корня репозитория:
+Docker Compose для локального запуска вынесен в репозиторий `loop_infra`.
+
+Из корня `loop_infra`:
 
 ```bash
 docker compose up --build
 ```
 
-Этот compose поднимает User Service, PostgreSQL и Redis. Для полноценной работы Kafka consumer/producer Kafka должна быть доступна по адресу из `KAFKA_BROKERS`.
-
-Для запуска всего backend-стека используется Docker Compose в репозитории HTTP Gateway:
-
-```bash
-docker compose up --build
-```
+В этом репозитории остается код сервиса, `Dockerfile` и пример переменных окружения `user-service/.env.example`.
