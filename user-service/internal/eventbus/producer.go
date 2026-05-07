@@ -11,18 +11,20 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-type EventType string
+type KafkaEventType string
 
 const (
-	UserProfileUpdated EventType = "user.profile_updated"
-	UserSettingsUpdated EventType = "user.settings_updated"
+	UserProfileUpdated  KafkaEventType = "user.profile_updated"
+	UserSettingsUpdated KafkaEventType = "user.settings_updated"
 )
 
-type Event struct {
-	EventID   string      `json:"event_id"`
-	Type      EventType   `json:"type"`
-	Timestamp string      `json:"timestamp"`
-	Data      interface{} `json:"data"`
+type KafkaEvent struct {
+	EventID       string         `json:"event_id"`
+	UserID        string         `json:"user_id"`
+	EventType     KafkaEventType `json:"event_type"`
+	SourceService string         `json:"source_service"`
+	Payload       interface{}    `json:"payload"`
+	OccurredAt    string         `json:"occurred_at"`
 }
 
 type KafkaProducer struct {
@@ -45,22 +47,24 @@ func (p *KafkaProducer) Close() error {
 	return p.writer.Close()
 }
 
-func (p *KafkaProducer) publish(ctx context.Context, topic string, eventType EventType, data interface{}) error {
-	event := Event{
-		EventID:   uuid.New().String(),
-		Type:      eventType,
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		Data:      data,
+func (p *KafkaProducer) publish(ctx context.Context, topic string, eventType KafkaEventType, userID string, payload interface{}) error {
+	event := KafkaEvent{
+		EventID:       uuid.New().String(),
+		UserID:        userID,
+		EventType:     eventType,
+		SourceService: "user-service",
+		Payload:       payload,
+		OccurredAt:    time.Now().UTC().Format(time.RFC3339Nano),
 	}
 
-	payload, err := json.Marshal(event)
+	encoded, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal event: %w", err)
 	}
 
 	err = p.writer.WriteMessages(ctx, kafka.Message{
 		Topic: topic,
-		Value: payload,
+		Value: encoded,
 	})
 
 	if err != nil {
@@ -73,21 +77,17 @@ func (p *KafkaProducer) publish(ctx context.Context, topic string, eventType Eve
 }
 
 func (p *KafkaProducer) SendUserProfileUpdated(ctx context.Context, userID string, changes map[string]interface{}) {
-	data := map[string]interface{}{
-		"user_id": userID,
+	payload := map[string]interface{}{
 		"changes": changes,
 	}
 
-	// Send to analytics service
-	_ = p.publish(ctx, "analytics.events", UserProfileUpdated, data)
+	_ = p.publish(ctx, "user.events", UserProfileUpdated, userID, payload)
 }
 
 func (p *KafkaProducer) SendUserSettingsUpdated(ctx context.Context, userID string, settings map[string]interface{}) {
-	data := map[string]interface{}{
-		"user_id":  userID,
+	payload := map[string]interface{}{
 		"settings": settings,
 	}
 
-	// Send to analytics service
-	_ = p.publish(ctx, "analytics.events", UserSettingsUpdated, data)
+	_ = p.publish(ctx, "user.events", UserSettingsUpdated, userID, payload)
 }

@@ -6,10 +6,10 @@ option go_package = "user-service/proto;userpb";
 
 service UserService {
   rpc GetProfile (GetProfileRequest) returns (GetProfileResponse);
-  rpc UpdateName (UpdateNameRequest) returns (Empty);
-  rpc UpdateStatus (UpdateStatusRequest) returns (Empty);
+  rpc UpdateName (UpdateNameRequest) returns (UserEmpty);
+  rpc UpdateStatus (UpdateStatusRequest) returns (UserEmpty);
   rpc GetSettings (GetSettingsRequest) returns (GetSettingsResponse);
-  rpc UpdateSettings (UpdateSettingsRequest) returns (Empty);
+  rpc UpdateSettings (UpdateSettingsRequest) returns (UserEmpty);
 }
 
 message GetProfileRequest {
@@ -47,4 +47,4 @@ message UpdateSettingsRequest {
   map<string, string> settings = 2;
 }
 
-message Empty {}
+message UserEmpty {}

@@ -56,10 +56,10 @@ func TestHandleEventCreatesUser(t *testing.T) {
 	consumer := &RegistrationConsumer{repo: repository}
 
 	event := map[string]interface{}{
-		"type": "user.registered",
-		"data": map[string]string{
-			"user_id": "user-1",
-			"email":   "user@example.com",
+		"user_id":    "user-1",
+		"event_type": "user.registered",
+		"payload": map[string]string{
+			"email": "user@example.com",
 		},
 	}
 	value, err := json.Marshal(event)
@@ -94,10 +94,8 @@ func TestHandleEventIgnoresUnknownType(t *testing.T) {
 	consumer := &RegistrationConsumer{repo: repository}
 
 	event := map[string]interface{}{
-		"type": "user.updated",
-		"data": map[string]string{
-			"user_id": "user-1",
-		},
+		"user_id":    "user-1",
+		"event_type": "user.updated",
 	}
 	value, err := json.Marshal(event)
 	if err != nil {

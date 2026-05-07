@@ -1,72 +1,47 @@
 # User Service
 
-User profile service for profile data, settings, and online status.
+gRPC service for user profiles, statuses, and settings.
 
-## Project layout
+## Architecture Role
 
-- `user-service/` - Go application source code
-- `user-service/.env.example` - example local environment variables
-- `.github/workflows/ci.yml` - CI/CD pipeline for the lab
-- `docker-compose.yml` - local infrastructure for the service
+- Receives user API calls from HTTP Gateway over gRPC.
+- Consumes `user.registered` events from Kafka and creates user profiles.
+- Publishes profile and settings changes to Kafka for Analytics Service.
+- Stores profile data in PostgreSQL and presence/status data in Redis.
 
-## Local run
+## Kafka Events
 
-1. Copy `user-service/.env.example` to `user-service/.env` and set your local values.
-2. Build the containers:
+User Service publishes the shared analytics event envelope to `user.events`:
 
-```powershell
-docker compose build
+```json
+{
+  "event_id": "uuid",
+  "user_id": "user-guid",
+  "event_type": "user.profile_updated",
+  "source_service": "user-service",
+  "payload": {
+    "changes": {
+      "name": "new-name"
+    }
+  },
+  "occurred_at": "2026-05-07T12:00:00Z"
+}
 ```
 
-3. Start the stack:
-
-```powershell
-docker compose up -d
-```
-
-4. Check containers:
-
-```powershell
-docker compose ps
-```
-
-5. Stop the stack:
-
-```powershell
-docker compose down
-```
-
-## Example environment variables
+## Configuration
 
 ```env
-PORT=8081
+GRPC_PORT=50052
 POSTGRES_HOST=db-user
 POSTGRES_PORT=5432
-POSTGRES_DB=user_db
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=change-me
+POSTGRES_DB=userdb
+POSTGRES_USER=user
+POSTGRES_PASSWORD=user_password
 REDIS_HOST=redis-user
 REDIS_PORT=6379
-REDIS_PASSWORD=
 KAFKA_BROKERS=kafka:9092
 ```
 
-## CI/CD for the lab
+## CI
 
-The GitHub Actions pipeline contains the required jobs:
-
-- `build`
-- `lint`
-- `test`
-- `docker_build`
-- `docker_push`
-
-The `test` job uploads coverage artifacts and fails if coverage is below `50%`.
-The `docker_push` job pushes the image only on `push` events and uses GitHub secrets for Docker Hub authentication.
-
-## GitHub secrets and variables
-
-Add these repository secrets before pushing Docker images:
-
-- `DOCKERHUB_USERNAME`
-- `DOCKERHUB_TOKEN`
+The GitHub Actions workflow runs build, golangci-lint, tests with coverage, Docker build, and Docker push.

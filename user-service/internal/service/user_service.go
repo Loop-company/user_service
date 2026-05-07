@@ -34,7 +34,20 @@ type UserServiceImpl struct {
 	eventBus EventBus
 }
 
-func NewUserService(repo repo.UserRepository, cache cache.UserCacheInterface, eventBus EventBus) *UserServiceImpl {
+type noopEventBus struct{}
+
+func (noopEventBus) SendUserProfileUpdated(ctx context.Context, userID string, changes map[string]interface{}) {
+}
+
+func (noopEventBus) SendUserSettingsUpdated(ctx context.Context, userID string, settings map[string]interface{}) {
+}
+
+func NewUserService(repo repo.UserRepository, cache cache.UserCacheInterface, eventBuses ...EventBus) *UserServiceImpl {
+	var eventBus EventBus = noopEventBus{}
+	if len(eventBuses) > 0 && eventBuses[0] != nil {
+		eventBus = eventBuses[0]
+	}
+
 	return &UserServiceImpl{
 		repo:     repo,
 		cache:    cache,

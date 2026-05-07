@@ -69,25 +69,25 @@ func (c *RegistrationConsumer) Start(ctx context.Context) error {
 
 func (c *RegistrationConsumer) handleEvent(ctx context.Context, msg kafka.Message) error {
 	var event struct {
-		Type string `json:"type"`
-		Data struct {
-			UserID string `json:"user_id"`
-			Email  string `json:"email"`
-		} `json:"data"`
+		UserID    string `json:"user_id"`
+		EventType string `json:"event_type"`
+		Payload   struct {
+			Email string `json:"email"`
+		} `json:"payload"`
 	}
 
 	if err := json.Unmarshal(msg.Value, &event); err != nil {
 		return fmt.Errorf("failed to unmarshal event: %w", err)
 	}
 
-	if event.Type != "user.registered" {
+	if event.EventType != "user.registered" {
 		return nil
 	}
 
-	slog.Info("Processing user registration", "user_id", event.Data.UserID)
+	slog.Info("Processing user registration", "user_id", event.UserID)
 
-	if existing, _ := c.repo.GetByID(ctx, event.Data.UserID); existing != nil {
-		slog.Warn("User profile already exists, skipping", "user_id", event.Data.UserID)
+	if existing, _ := c.repo.GetByID(ctx, event.UserID); existing != nil {
+		slog.Warn("User profile already exists, skipping", "user_id", event.UserID)
 		return nil
 	}
 
@@ -97,9 +97,9 @@ func (c *RegistrationConsumer) handleEvent(ctx context.Context, msg kafka.Messag
 	}
 
 	user := &entity.User{
-		ID:            event.Data.UserID,
+		ID:            event.UserID,
 		Discriminator: discriminator,
-		Name:          event.Data.Email,
+		Name:          event.Payload.Email,
 		Avatar:        "",
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),

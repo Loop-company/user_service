@@ -32,14 +32,14 @@ func (s *UserServer) GetProfile(ctx context.Context, req *userpb.GetProfileReque
 	}, nil
 }
 
-func (s *UserServer) UpdateName(ctx context.Context, req *userpb.UpdateNameRequest) (*userpb.Empty, error) {
+func (s *UserServer) UpdateName(ctx context.Context, req *userpb.UpdateNameRequest) (*userpb.UserEmpty, error) {
 	err := s.service.UpdateName(ctx, req.UserId, req.Name)
-	return &userpb.Empty{}, err
+	return &userpb.UserEmpty{}, err
 }
 
-func (s *UserServer) UpdateStatus(ctx context.Context, req *userpb.UpdateStatusRequest) (*userpb.Empty, error) {
+func (s *UserServer) UpdateStatus(ctx context.Context, req *userpb.UpdateStatusRequest) (*userpb.UserEmpty, error) {
 	err := s.service.UpdateStatus(ctx, req.UserId, req.Status)
-	return &userpb.Empty{}, err
+	return &userpb.UserEmpty{}, err
 }
 
 func (s *UserServer) GetSettings(ctx context.Context, req *userpb.GetSettingsRequest) (*userpb.GetSettingsResponse, error) {
@@ -58,14 +58,14 @@ func (s *UserServer) GetSettings(ctx context.Context, req *userpb.GetSettingsReq
 	}, nil
 }
 
-func (s *UserServer) UpdateSettings(ctx context.Context, req *userpb.UpdateSettingsRequest) (*userpb.Empty, error) {
+func (s *UserServer) UpdateSettings(ctx context.Context, req *userpb.UpdateSettingsRequest) (*userpb.UserEmpty, error) {
 	data := make(map[string]interface{})
 	for k, v := range req.Settings {
 		data[k] = v
 	}
 
 	err := s.service.UpdateSettings(ctx, req.UserId, data)
-	return &userpb.Empty{}, err
+	return &userpb.UserEmpty{}, err
 }
 
 func toString(v interface{}) string {

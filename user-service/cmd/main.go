@@ -52,13 +52,18 @@ func main() {
 
 	userpb.RegisterUserServiceServer(grpcServer, userServer)
 
-	lis, err := net.Listen("tcp", ":50051")
+	grpcPort := os.Getenv("GRPC_PORT")
+	if grpcPort == "" {
+		grpcPort = "50052"
+	}
+
+	lis, err := net.Listen("tcp", ":"+grpcPort)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
 	go func() {
-		log.Println("gRPC server started on :50051")
+		log.Printf("gRPC server started on :%s", grpcPort)
 		if err := grpcServer.Serve(lis); err != nil {
 			log.Fatalf("gRPC server failed: %v", err)
 		}
@@ -175,4 +180,3 @@ func getKafkaBrokers() []string {
 	}
 	return strings.Split(brokers, ",")
 }
-

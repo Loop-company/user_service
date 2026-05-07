@@ -19,6 +19,6 @@ COPY --from=builder /out/user-service /app/main
 
 COPY --from=builder /src/migrations ./migrations
 
-EXPOSE 8081
+EXPOSE 50052
 
 CMD ["/app/main"]
