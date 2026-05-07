@@ -1,6 +1,6 @@
 # User Service
 
-User Service хранит пользовательские профили, статусы и настройки. HTTP Gateway обращается к нему по gRPC. Кроме gRPC, сервис читает событие регистрации из Kafka и публикует события об изменениях профиля/настроек для аналитики.
+User Service хранит пользовательские профили, статусы и настройки. HTTP Gateway обращается к сервису по gRPC. Кроме gRPC, сервис читает событие регистрации из Kafka и публикует события об изменениях профиля/настроек для аналитики.
 
 ## Место в архитектуре
 
@@ -23,7 +23,7 @@ User Service:
 
 ## gRPC API
 
-Сервис описан в `user-service/proto/user.proto`.
+Контракт описан в `user-service/proto/user.proto`.
 
 - `GetProfile(user_id)` - возвращает профиль пользователя.
 - `UpdateName(user_id, name)` - обновляет имя пользователя.
@@ -85,35 +85,16 @@ KAFKA_BROKERS=kafka:9092
 
 ## Запуск
 
-Рекомендуемый способ для всего проекта:
+Для запуска User Service через Docker Compose из корня репозитория:
 
-```powershell
-cd C:\Users\kira4\Loop-company\http_gateway
+```bash
 docker compose up --build
 ```
 
-Так поднимаются gateway, auth, user, analytics, PostgreSQL, Redis и Kafka topics.
+Этот compose поднимает User Service, PostgreSQL и Redis. Для полноценной работы Kafka consumer/producer Kafka должна быть доступна по адресу из `KAFKA_BROKERS`.
 
-Локальный запуск только User Service:
+Для запуска всего backend-стека используется Docker Compose в репозитории HTTP Gateway:
 
-```powershell
-cd C:\Users\kira4\Loop-company\user_service\user-service
-go run ./cmd
-```
-
-Перед локальным запуском должны быть доступны PostgreSQL, Redis и Kafka. Для service-only Docker Compose:
-
-```powershell
-cd C:\Users\kira4\Loop-company\user_service
+```bash
 docker compose up --build
-```
-
-Этот compose поднимает user, PostgreSQL и Redis. Kafka должна быть доступна отдельно по `KAFKA_BROKERS`, если нужно проверить consumer/producer.
-
-## Проверки
-
-```powershell
-cd C:\Users\kira4\Loop-company\user_service\user-service
-go test ./...
-go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run --config ..\.golangci.yml
 ```
